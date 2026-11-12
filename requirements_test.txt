@@ -1,0 +1,5 @@
+pytest-homeassistant-custom-component==0.13.375
+# Needed to import homeassistant.components.bluetooth and its usb dependency
+aiousbwatcher==1.1.2
+serialx==1.11.0
+ruff==0.14.4

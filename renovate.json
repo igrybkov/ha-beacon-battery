@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":semanticCommits"
+  ],
+  "timezone": "America/Chicago",
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "The test harness pins a Home Assistant version. Review these by hand.",
+      "matchDepNames": ["pytest-homeassistant-custom-component", "aiousbwatcher", "serialx"],
+      "groupName": "home assistant test harness",
+      "automerge": false
+    },
+    {
+      "description": "One PR for GitHub Actions, reviewed by hand.",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "minimumReleaseAge": "7 days",
+      "automerge": false
+    }
+  ]
+}

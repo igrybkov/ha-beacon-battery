@@ -1,0 +1,14 @@
+{
+  "domain": "beacon_battery",
+  "name": "Beacon Battery",
+  "codeowners": ["@igrybkov"],
+  "config_flow": true,
+  "dependencies": ["bluetooth"],
+  "documentation": "https://github.com/igrybkov/ha-beacon-battery",
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/igrybkov/ha-beacon-battery/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}

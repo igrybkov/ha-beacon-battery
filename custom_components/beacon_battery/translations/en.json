@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Adds a battery sensor to each beacon device that sends a battery frame. All settings have defaults. Change them later under Configure."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Beacon Battery is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "source_domain": "Source integration",
+          "service_data_uuid": "Service data UUID",
+          "battery_byte": "Battery byte position",
+          "max_level": "Maximum level",
+          "heartbeat_minutes": "Heartbeat interval"
+        },
+        "data_description": {
+          "source_domain": "Integration whose devices get a battery sensor. Only devices it identifies by MAC address are used.",
+          "service_data_uuid": "Service data that carries the battery level. A 16-bit form such as 2080 also works.",
+          "battery_byte": "Position of the battery byte in that service data, counting from 0.",
+          "max_level": "Higher readings are capped to this value.",
+          "heartbeat_minutes": "Every this many minutes, the level of each beacon still in range is written again, so battery checks see it as alive."
+        }
+      }
+    },
+    "error": {
+      "required": "This value is required.",
+      "invalid_uuid": "Enter a 16-bit UUID such as 2080, or a full 128-bit UUID."
+    }
+  }
+}
