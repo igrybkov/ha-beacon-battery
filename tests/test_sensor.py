@@ -18,7 +18,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.beacon_battery.const import (
-    CONF_BATTERY_BYTE,
+    CONF_FRAMES,
     CONF_HEARTBEAT_MINUTES,
     DEFAULT_OPTIONS,
 )
@@ -28,7 +28,9 @@ from .conftest import (
     RECYCLE_PAYLOAD,
     TRASH_MAC,
     TRASH_PAYLOAD,
+    TRASH_SYSTEM,
     UUID_2080,
+    UUID_FEAA,
     FakeBluetooth,
 )
 
@@ -42,8 +44,11 @@ async def test_registers_non_connectable_matcher(
     hass: HomeAssistant, fake_bluetooth: FakeBluetooth, entry: MockConfigEntry
 ) -> None:
     await _setup(hass, entry)
-    [(_, matcher)] = fake_bluetooth.callbacks
-    assert matcher == {"service_data_uuid": UUID_2080, "connectable": False}
+    matchers = [matcher for _, matcher in fake_bluetooth.callbacks]
+    assert matchers == [
+        {"service_data_uuid": UUID_FEAA, "connectable": False},
+        {"service_data_uuid": UUID_2080, "connectable": False},
+    ]
 
 
 async def test_sensor_attaches_to_source_device(
@@ -106,19 +111,53 @@ async def test_device_added_later_is_picked_up(
     assert hass.states.get("sensor.trash_bin_battery").state == "100"
 
 
-async def test_battery_byte_option(
+async def test_frames_option(
     hass: HomeAssistant,
     fake_bluetooth: FakeBluetooth,
     bin_devices: dict[str, str],
 ) -> None:
     entry = MockConfigEntry(
-        domain="beacon_battery", options={**DEFAULT_OPTIONS, CONF_BATTERY_BYTE: 1}
+        domain="beacon_battery", options={**DEFAULT_OPTIONS, CONF_FRAMES: ["2080:1"]}, version=2
     )
     entry.add_to_hass(hass)
     await _setup(hass, entry)
     fake_bluetooth.advert(TRASH_MAC, {UUID_2080: TRASH_PAYLOAD})
     await hass.async_block_till_done()
     assert hass.states.get("sensor.trash_bin_battery").state == str(0x1C)
+
+
+async def test_system_frame_alone_creates_sensor(
+    hass: HomeAssistant,
+    fake_bluetooth: FakeBluetooth,
+    bin_devices: dict[str, str],
+    entry: MockConfigEntry,
+) -> None:
+    await _setup(hass, entry)
+    fake_bluetooth.advert(TRASH_MAC, {UUID_FEAA: TRASH_SYSTEM})
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.trash_bin_battery").state == "100"
+
+
+async def test_live_frame_beats_stale_merged_frame(
+    hass: HomeAssistant,
+    fake_bluetooth: FakeBluetooth,
+    bin_devices: dict[str, str],
+) -> None:
+    entry = MockConfigEntry(
+        domain="beacon_battery", options={**DEFAULT_OPTIONS, "max_level": 255}, version=2
+    )
+    entry.add_to_hass(hass)
+    await _setup(hass, entry)
+    # Merged data: a system frame the beacon no longer sends, plus 0x2080.
+    stale = {UUID_FEAA: TRASH_SYSTEM}
+    fake_bluetooth.advert(TRASH_MAC, {**stale, UUID_2080: TRASH_PAYLOAD})
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.trash_bin_battery").state == "105"
+
+    # Only 0x2080 changes, so it wins over the stale system frame.
+    fake_bluetooth.advert(TRASH_MAC, {**stale, UUID_2080: bytes.fromhex("5a1c0efe1355")})
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.trash_bin_battery").state == "90"
 
 
 async def test_writes_only_on_change_from_adverts(

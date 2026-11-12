@@ -14,15 +14,13 @@
       "init": {
         "data": {
           "source_domain": "Source integration",
-          "service_data_uuid": "Service data UUID",
-          "battery_byte": "Battery byte position",
+          "frames": "Battery frames",
           "max_level": "Maximum level",
           "heartbeat_minutes": "Heartbeat interval"
         },
         "data_description": {
           "source_domain": "Integration whose devices get a battery sensor. Only devices it identifies by MAC address are used.",
-          "service_data_uuid": "Service data that carries the battery level. A 16-bit form such as 2080 also works.",
-          "battery_byte": "Position of the battery byte in that service data, counting from 0.",
+          "frames": "Service data frames that carry battery %, one per line, as uuid:byte or uuid:byte:prefix. byte is the position of the level, counting from 0. prefix (hex) must start the data, which tells apart frames that share a UUID. The frame that changed last is read. When several change at once, the lowest level wins, then list order.",
           "max_level": "Higher readings are capped to this value.",
           "heartbeat_minutes": "Every this many minutes, the level of each beacon still in range is written again, so battery checks see it as alive."
         }
@@ -30,7 +28,7 @@
     },
     "error": {
       "required": "This value is required.",
-      "invalid_uuid": "Enter a 16-bit UUID such as 2080, or a full 128-bit UUID."
+      "invalid_frame": "Write each frame as uuid:byte or uuid:byte:prefix, for example 2080:0 or feaa:2:22. The UUID is 16-bit (2080) or full 128-bit; the prefix is hex."
     }
   }
 }

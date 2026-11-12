@@ -31,6 +31,7 @@ To release, bump `version` in `custom_components/beacon_battery/manifest.json` a
 
 - Every tunable is an option with a default. Code constants are defaults only.
 - Attach sensors to the source device with `entity.device_entry`. Do not use `device_info`: since HA 2026.10 a device belongs to one config entry, so `device_info` creates a second device.
+- Frames are `uuid:byte[:prefix]` specs, parsed in `helpers.parse_frame`. `FrameChooser` picks the frame whose payload changed last; on a tie, the lowest level, then list order. The Bluetooth stack merges service data across adverts, so a frame the beacon stopped sending stays visible. Never pick by list order alone.
 - The Bluetooth matcher must set `connectable: False`. The default is connectable only, and beacons send non-connectable adverts.
 - The Bluetooth stack does not call callbacks for adverts with an unchanged payload. The callback handles changes only. The heartbeat timer uses `async_address_present` and `async_last_service_info` to report beacons that are still in range.
 - Comments and docs must stand on their own. Never refer to private plans, tickets or chat history.

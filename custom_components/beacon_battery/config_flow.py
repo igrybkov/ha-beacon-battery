@@ -11,15 +11,19 @@ from homeassistant.helpers import selector
 
 from . import BeaconBatteryConfigEntry
 from .const import (
-    CONF_BATTERY_BYTE,
+    CONF_FRAMES,
     CONF_HEARTBEAT_MINUTES,
     CONF_MAX_LEVEL,
-    CONF_SERVICE_DATA_UUID,
     CONF_SOURCE_DOMAIN,
     DEFAULT_OPTIONS,
     DOMAIN,
 )
-from .helpers import normalize_service_data_uuid
+from .helpers import format_frame, parse_frame
+
+
+def default_options() -> dict[str, Any]:
+    """Return a fresh copy of the default options."""
+    return {**DEFAULT_OPTIONS, CONF_FRAMES: list(DEFAULT_OPTIONS[CONF_FRAMES])}
 
 
 def _number(minimum: int, maximum: int, unit: str | None = None) -> selector.NumberSelector:
@@ -41,10 +45,9 @@ def _options_schema(current: dict[str, Any]) -> vol.Schema:
             vol.Required(
                 CONF_SOURCE_DOMAIN, default=values[CONF_SOURCE_DOMAIN]
             ): selector.TextSelector(),
-            vol.Required(
-                CONF_SERVICE_DATA_UUID, default=values[CONF_SERVICE_DATA_UUID]
-            ): selector.TextSelector(),
-            vol.Required(CONF_BATTERY_BYTE, default=values[CONF_BATTERY_BYTE]): _number(0, 30),
+            vol.Required(CONF_FRAMES, default=list(values[CONF_FRAMES])): selector.TextSelector(
+                selector.TextSelectorConfig(multiple=True)
+            ),
             vol.Required(CONF_MAX_LEVEL, default=values[CONF_MAX_LEVEL]): _number(1, 255, "%"),
             vol.Required(CONF_HEARTBEAT_MINUTES, default=values[CONF_HEARTBEAT_MINUTES]): _number(
                 1, 1440, "min"
@@ -60,12 +63,15 @@ def _validate(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str
     cleaned[CONF_SOURCE_DOMAIN] = user_input[CONF_SOURCE_DOMAIN].strip()
     if not cleaned[CONF_SOURCE_DOMAIN]:
         errors[CONF_SOURCE_DOMAIN] = "required"
-    uuid = normalize_service_data_uuid(user_input[CONF_SERVICE_DATA_UUID])
-    if uuid is None:
-        errors[CONF_SERVICE_DATA_UUID] = "invalid_uuid"
+    specs = [spec for spec in user_input[CONF_FRAMES] if spec.strip()]
+    frames = [parse_frame(spec) for spec in specs]
+    if not frames:
+        errors[CONF_FRAMES] = "required"
+    elif None in frames:
+        errors[CONF_FRAMES] = "invalid_frame"
     else:
-        cleaned[CONF_SERVICE_DATA_UUID] = uuid
-    for key in (CONF_BATTERY_BYTE, CONF_MAX_LEVEL, CONF_HEARTBEAT_MINUTES):
+        cleaned[CONF_FRAMES] = [format_frame(frame) for frame in frames if frame]
+    for key in (CONF_MAX_LEVEL, CONF_HEARTBEAT_MINUTES):
         cleaned[key] = int(user_input[key])
     return cleaned, errors
 
@@ -73,13 +79,13 @@ def _validate(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str
 class BeaconBatteryConfigFlow(ConfigFlow, domain=DOMAIN):
     """Set up one Beacon Battery instance."""
 
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Create the entry. All settings have defaults and live in options."""
         if user_input is not None:
             return self.async_create_entry(
-                title="Beacon Battery", data={}, options=dict(DEFAULT_OPTIONS)
+                title="Beacon Battery", data={}, options=default_options()
             )
         return self.async_show_form(step_id="user")
 

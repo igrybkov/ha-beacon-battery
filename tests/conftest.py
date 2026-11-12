@@ -15,11 +15,15 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.beacon_battery.const import DEFAULT_OPTIONS, DOMAIN
 
 UUID_2080 = "00002080-0000-1000-8000-00805f9b34fb"
+UUID_FEAA = "0000feaa-0000-1000-8000-00805f9b34fb"
 TRASH_MAC = "dd:34:02:0a:42:e7"
 RECYCLE_MAC = "dd:34:02:0a:43:81"
 # Captured from the real beacons: [battery, ?, major, minor]
 TRASH_PAYLOAD = bytes.fromhex("691c0efe1355")
 RECYCLE_PAYLOAD = bytes.fromhex("661c1c601c61")
+# KKM system frame on the Eddystone UUID: [0x22, ?, battery, MAC, ...]
+TRASH_SYSTEM = bytes.fromhex("222f69dd34020a42e70640")
+RECYCLE_SYSTEM = bytes.fromhex("222f66dd34020a43810640")
 
 
 @pytest.fixture(autouse=True)
@@ -61,8 +65,9 @@ class FakeBluetooth:
         )
         self.last[info.address] = info
         self.present.add(info.address)
-        for callback, _matcher in list(self.callbacks):
-            callback(info, BluetoothChange.ADVERTISEMENT)
+        for callback, matcher in list(self.callbacks):
+            if matcher["service_data_uuid"] in service_data:
+                callback(info, BluetoothChange.ADVERTISEMENT)
 
 
 @pytest.fixture
@@ -117,6 +122,8 @@ def bin_devices(hass: HomeAssistant, source_entry: MockConfigEntry) -> dict[str,
 @pytest.fixture
 def entry(hass: HomeAssistant) -> MockConfigEntry:
     """Beacon Battery config entry with default options."""
-    entry = MockConfigEntry(domain=DOMAIN, title="Beacon Battery", options=dict(DEFAULT_OPTIONS))
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="Beacon Battery", options=dict(DEFAULT_OPTIONS), version=2
+    )
     entry.add_to_hass(hass)
     return entry

@@ -21,14 +21,13 @@ from homeassistant.helpers.event import async_track_time_interval
 
 from . import BeaconBatteryConfigEntry
 from .const import (
-    CONF_BATTERY_BYTE,
+    CONF_FRAMES,
     CONF_HEARTBEAT_MINUTES,
     CONF_MAX_LEVEL,
-    CONF_SERVICE_DATA_UUID,
     CONF_SOURCE_DOMAIN,
     DEFAULT_OPTIONS,
 )
-from .helpers import mac_identifiers, normalize_mac, parse_battery
+from .helpers import FrameChooser, mac_identifiers, normalize_mac, parse_frame
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,9 +59,8 @@ class BeaconTracker:
         self._entry = entry
         self._add_entities = async_add_entities
         self._source_domain: str = options[CONF_SOURCE_DOMAIN]
-        self._uuid: str = options[CONF_SERVICE_DATA_UUID]
-        self._byte: int = int(options[CONF_BATTERY_BYTE])
-        self._max_level: int = int(options[CONF_MAX_LEVEL])
+        frames = [frame for spec in options[CONF_FRAMES] if (frame := parse_frame(spec))]
+        self._chooser = FrameChooser(frames, int(options[CONF_MAX_LEVEL]))
         self._heartbeat = timedelta(minutes=int(options[CONF_HEARTBEAT_MINUTES]))
         # MAC -> device ID of the source device
         self._devices: dict[str, str] = {}
@@ -80,14 +78,15 @@ class BeaconTracker:
         )
         # Beacons send non-connectable adverts. The matcher defaults to
         # connectable only, so it must be turned off explicitly.
-        self._entry.async_on_unload(
-            bluetooth.async_register_callback(
-                self._hass,
-                self._async_on_advert,
-                {CONF_SERVICE_DATA_UUID: self._uuid, "connectable": False},
-                bluetooth.BluetoothScanningMode.PASSIVE,
+        for uuid in self._chooser.uuids:
+            self._entry.async_on_unload(
+                bluetooth.async_register_callback(
+                    self._hass,
+                    self._async_on_advert,
+                    {"service_data_uuid": uuid, "connectable": False},
+                    bluetooth.BluetoothScanningMode.PASSIVE,
+                )
             )
-        )
         # The Bluetooth stack drops adverts whose payload did not change, so
         # the callback above only sees changes. A timer reports the level of
         # every beacon that is still present, so "last reported" stays fresh.
@@ -146,7 +145,7 @@ class BeaconTracker:
         mac = normalize_mac(service_info.address)
         if mac is None or (device := self._device(mac)) is None:
             return
-        level = parse_battery(service_info.service_data, self._uuid, self._byte, self._max_level)
+        level = self._chooser.level(mac, service_info.service_data, track=True)
         if level is None:
             return
         if (entity := self._entities.get(mac)) is None:
@@ -167,7 +166,7 @@ class BeaconTracker:
             info = bluetooth.async_last_service_info(self._hass, address, connectable=False)
             if info is None:
                 continue
-            level = parse_battery(info.service_data, self._uuid, self._byte, self._max_level)
+            level = self._chooser.level(mac, info.service_data, track=False)
             if level is not None:
                 entity.async_set_level(level, force=True)
 
