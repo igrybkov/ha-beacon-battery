@@ -1,0 +1,110 @@
+name: Release
+
+# A release starts from main, never from a tag. When the version in
+# custom_components/beacon_battery/manifest.json has no tag yet, this runs the
+# same checks as CI and only then creates the tag and the GitHub release. The
+# tag has no "v" prefix: the Marketplace expects it to equal the manifest
+# version. A failed check leaves no tag, so a tag always means a release. Run
+# it by hand (workflow_dispatch) to retry a failed release of the same version.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # plan reads the version and decides whether it still needs a release.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read the version and look for its tag
+        id: version
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::releases run from main only, not $GITHUB_REF"
+            exit 1
+          fi
+          version=$(jq -r .version custom_components/beacon_battery/manifest.json)
+          if [ -z "$version" ] || [ "$version" = null ]; then
+            echo "::error::no version in manifest.json"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags "https://github.com/$GITHUB_REPOSITORY" "refs/tags/$version" >/dev/null; then
+            echo "$version is already released; nothing to do."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # The same checks as CI.
+  test:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+      - name: Set up venv
+        run: make venv
+      - name: Lint
+        run: make lint
+      - name: Test
+        run: make test
+
+  hassfest:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: integration
+
+  github-release:
+    needs: [plan, test, hassfest, hacs]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Tag and create the GitHub release from CHANGELOG
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          # Section for this version: from "## X.Y.Z" up to the next "## ".
+          awk -v v="$VERSION" '
+            $0 == "## " v { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Release $VERSION" > notes.md
+          gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "$VERSION" --notes-file notes.md

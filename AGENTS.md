@@ -2,7 +2,7 @@
 
 This file guides AI coding agents (Claude Code, Codex, Cursor and others) that work in this repository.
 
-Beacon Battery is a Home Assistant custom integration, installed through HACS. It adds a battery sensor to each BLE beacon device of a source integration (Bermuda by default). The level is decoded from a service data frame in the beacon's adverts.
+Beacon Battery is a Home Assistant custom integration, installed through the Home Assistant Marketplace (formerly HACS). It adds a battery sensor to each BLE beacon device of a source integration (Bermuda by default). The level is decoded from a service data frame in the beacon's adverts.
 
 ## Commands
 
@@ -14,6 +14,10 @@ make format
 ```
 
 CI runs lint, tests, hassfest and HACS validation. Run `make lint test` before you call a change done.
+
+## Releases
+
+To release, bump `version` in `custom_components/beacon_battery/manifest.json` and add a `## X.Y.Z` section to `CHANGELOG.md` in the same commit. When that reaches `main`, `.github/workflows/release.yaml` runs the CI checks, then creates tag `X.Y.Z` (no `v` prefix, since the Marketplace matches the tag to the manifest version) and a GitHub release with that changelog section as notes. Do not create tags by hand.
 
 ## Layout
 
