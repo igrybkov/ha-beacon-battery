@@ -68,7 +68,7 @@ async def test_sensor_attaches_to_source_device(
 
     # The sensor joins the existing device: no second device, name unchanged.
     dev_reg = dr.async_get(hass)
-    assert len(dev_reg.devices) == 3
+    assert len(dev_reg.devices) == 4
     assert dev_reg.async_get(bin_devices[TRASH_MAC]).name == "Trash Bin"
 
 

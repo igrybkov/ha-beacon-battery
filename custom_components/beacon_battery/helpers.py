@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
+from typing import Any
 
 from .const import BLUETOOTH_BASE_UUID_SUFFIX
 
@@ -30,16 +31,21 @@ def normalize_service_data_uuid(value: str) -> str | None:
 
 
 def mac_identifiers(
-    identifiers: Iterable[tuple[str, str]], source_domain: str
+    identifiers: Iterable[tuple[Any, ...]], source_domain: str
 ) -> dict[str, tuple[str, str]]:
     """Map each MAC identifier of the source integration to the identifier itself.
 
     Identifiers that are not MACs (for example iBeacon UUID based ones) are
-    skipped, since adverts only carry the MAC.
+    skipped, since adverts only carry the MAC. Other integrations store
+    identifiers of other shapes (three parts, non-string values), so only a
+    two-part identifier with a string value is read.
     """
     found: dict[str, tuple[str, str]] = {}
-    for domain, value in identifiers:
-        if domain != source_domain:
+    for identifier in identifiers:
+        if len(identifier) != 2:
+            continue
+        domain, value = identifier
+        if domain != source_domain or not isinstance(value, str):
             continue
         if mac := normalize_mac(value):
             found[mac] = (domain, value)

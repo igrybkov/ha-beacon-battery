@@ -35,6 +35,19 @@ def test_mac_identifiers_keeps_only_source_macs() -> None:
     assert found == {"dd:34:02:0a:42:e7": ("bermuda", "dd:34:02:0a:42:e7")}
 
 
+def test_mac_identifiers_skips_other_shapes() -> None:
+    found = mac_identifiers(
+        [
+            ("bermuda", "dd:34:02:0a:42:e7", "extra"),
+            ("bermuda",),
+            ("bermuda", 12345),
+            ("bermuda", "dd:34:02:0a:43:81"),
+        ],
+        "bermuda",
+    )
+    assert found == {"dd:34:02:0a:43:81": ("bermuda", "dd:34:02:0a:43:81")}
+
+
 def test_parse_battery() -> None:
     data = {UUID_2080: TRASH_PAYLOAD}
     assert parse_battery(data, UUID_2080, 0, 100) == 100  # 0x69 = 105, capped

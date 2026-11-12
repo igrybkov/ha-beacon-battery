@@ -103,6 +103,14 @@ def bin_devices(hass: HomeAssistant, source_entry: MockConfigEntry) -> dict[str,
         identifiers={("bermuda", "526db0c2f719410d90e4847ebd88759b_7264_7265")},
         name="Old iBeacon",
     )
+    # Some integrations store three-part identifiers. They must not break setup.
+    other = MockConfigEntry(domain="other_integration")
+    other.add_to_hass(hass)
+    reg.async_get_or_create(
+        config_entry_id=other.entry_id,
+        identifiers={("other_integration", "hub", "1")},
+        name="Odd Identifier Device",
+    )
     return ids
 
 
